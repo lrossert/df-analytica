@@ -73,6 +73,8 @@ def match_goal_data(events):
         start_idx = start_idx + 1
     goal_data = events[start_idx+1:]
     # remove closing odds
+
+    # use when betting is suspended to close the odds
     goal_data = goal_data[:-2]
     # there are 2 entries for every goal so we take the second ones
     goal_data = [goal_data[goal_idx] for goal_idx in range(len(goal_data))\
@@ -153,8 +155,45 @@ def get_goals(goal_data, data):
         except KeyError:
             print("No odds available. Match coming towards an end at time {0}"\
             .format(goal["clk"]))
-    print(goals_list)
     return goals_list
+
+def get_match_data(goal_data, data):
+    goal_list = get_goals(goal_data, data)
+    events = get_events(data)
+    start_data = match_start_data(events)
+    draw_id, home_id, away_id = get_ids(start_data)
+    print(goal_list)
+    # the followinf should not be hard coded but attributes of the class
+    start_idx = 211
+    end_idx = 310
+    for odds_idx in range(start_idx+1, end_idx+1):
+        score_dict = {home_id: 0, away_id: 0}
+        odds = data[odds_idx]
+        clk = odds["clk"]
+        try:
+            formatted_odds  = _prettify_odds(odds["mc"][0]["rc"])
+            if draw_id in formatted_odds.keys():
+                formatted_odds["draw_odds"] = formatted_odds.pop(draw_id)
+            if home_id in formatted_odds.keys():
+                formatted_odds["home_odds"] = formatted_odds.pop(home_id)
+            if away_id in formatted_odds.keys():
+                formatted_odds["away_odds"] = formatted_odds.pop(away_id)
+            for goal in goal_list:
+                goal_clk = goal["clk"]
+                if int(clk) >= int(goal_clk):
+                    score_dict = copy.deepcopy(goal)
+                score_dict["clk"] = clk
+            # Note this overides the team odds but we are
+            # only concerned with draw odds in our strategy
+            formatted_odds.update(score_dict)
+        except KeyError:
+            print("No odds available. Match coming towards an end at time {0}"\
+            .format(goal["clk"]))
+        
+
+        print(formatted_odds)
+
+    
     
 
 if __name__ == "__main__":
@@ -167,3 +206,4 @@ if __name__ == "__main__":
     goal_data = match_goal_data(events)
     _prettify_odds([{u'ltp': 1.89, u'id': 6480414}, {u'ltp': 4.8, u'id': 3862627}])
     goals = get_goals(goal_data, data)
+    get_match_data(goal_data, data)
