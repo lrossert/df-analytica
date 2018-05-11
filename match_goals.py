@@ -180,7 +180,9 @@ class Match():
         return goal_list
     
     def get_match_odds_data(self):
-        # the followinf should not be hard coded but attributes of the class
+        """Returns a list of dicts of times and odds at those times.
+
+        Where odds are not available take the previous odds as a proxy."""
         match_data = []
         prev_formatted_odds = None
         for odds_idx in range(self.start_idx+1, self.end_idx+1):
@@ -196,8 +198,6 @@ class Match():
                     formatted_odds["away_odds"] = formatted_odds.pop(self.away_id)
                 for goal in self.goals:
                     goal_clk = goal["clk"]
-                # Note this overides the team odds but we are
-                # only concerned with draw odds in our strategy
                 formatted_odds.update({"clk": clk})
                 # Make the assmption that if the odds are not given they havent
                 # changed from the previous odds.
