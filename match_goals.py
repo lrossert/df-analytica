@@ -3,6 +3,7 @@ import sys
 import copy
 
 odds_file = "data/xds/historic/BASIC/28522440/1.138129751" 
+#odds_file = "data/xds/historic/BASIC/28553681/1.139123056" 
 
 class Match():
 
@@ -16,6 +17,7 @@ class Match():
         self.outcomes = list(self.get_ids())
         self.match_start_odds = self.get_draw_odds_1_min_before_start()
         self.goal_data = self.match_goal_data()
+        print(self.goal_data)
         self.end_idx = self.get_end_idx()
         self.goals = self.get_goals()
         self.match_data = self.get_match_data()
@@ -136,39 +138,45 @@ class Match():
             odds_dict_entry = {odds["id"]: odds["ltp"]}
             odds_dict.update(odds_dict_entry)
         return odds_dict       
+
+    def check_goal_scored(self, goal_dict, goal_list, goal, clk):
+        odds_after_goal = self._prettify_odds(goal["mc"][0]["rc"])
+        if not goal_dict:
+            print("Making goal_dict")
+            goal_dict = {"clk": clk, self.home_id: 0, self.away_id: 0}
+        else:
+            goal_dict = copy.deepcopy(goal_dict)
+            goal_dict["clk"] = clk
+        odds_before_goal = self._get_odds_before_goal(goal)
+        odds_before_goal = self._prettify_odds(odds_before_goal)
+        if odds_before_goal[self.home_id] < odds_after_goal[self.home_id]\
+        and odds_before_goal[self.away_id] > odds_after_goal[self.away_id]:
+            goal_dict[self.away_id] = goal_dict[self.away_id] + 1
+        elif odds_before_goal[self.home_id] > odds_after_goal[self.home_id]\
+        and odds_before_goal[self.away_id] < odds_after_goal[self.away_id]:
+            goal_dict[self.home_id] = goal_dict[self.home_id] + 1
+        else:
+            print("Can't conclude there was a goal")
+        goal_list.append(goal_dict)
+        return goal_list
+
+
     
     def get_goals(self):
         """Returns a list of scores at clk times when the goals happen.
     
         Compares the odds just before the goal event to the odds after
         to estimate which team scored."""
-        goals_list = []
+        goal_list = []
         goal_dict = {}
         for goal in self.goal_data:
             clk = goal["clk"]
             try:
-                odds_after_goal = self._prettify_odds(goal["mc"][0]["rc"])
-                if not goal_dict:
-                    print("Making goal_dict")
-                    goal_dict = {"clk": clk, self.home_id: 0, self.away_id: 0}
-                else:
-                    goal_dict = copy.deepcopy(goal_dict)
-                    goal_dict["clk"] = clk
-                odds_before_goal = self._get_odds_before_goal(goal)
-                odds_before_goal = self._prettify_odds(odds_before_goal)
-                if odds_before_goal[self.home_id] < odds_after_goal[self.home_id]\
-                and odds_before_goal[self.away_id] > odds_after_goal[self.away_id]:
-                    goal_dict[self.away_id] = goal_dict[self.away_id] + 1
-                elif odds_before_goal[self.home_id] > odds_after_goal[self.home_id]\
-                and odds_before_goal[self.away_id] < odds_after_goal[self.away_id]:
-                    goal_dict[self.home_id] = goal_dict[self.home_id] + 1
-                else:
-                    print("Can't conclude there was a goal")
-                goals_list.append(goal_dict)
+                goal_list = self.check_goal_scored(goal_dict, goal_list, goal, clk)
             except KeyError:
                 print("No odds available. Match coming towards an end at time {0}"\
                 .format(goal["clk"]))
-        return goals_list
+        return goal_list
     
     def get_match_data(self):
         # the followinf should not be hard coded but attributes of the class
@@ -202,4 +210,3 @@ class Match():
 
 if __name__ == "__main__":
     match = Match(odds_file)
-    print(match.match_data)
