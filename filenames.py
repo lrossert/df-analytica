@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import match_goals
 
 data_dir = 'data/xds/historic/BASIC'
 
@@ -21,12 +22,27 @@ for folder, subfolders, files in os.walk(data_dir, 'w'):
         if not file_.endswith('.bz2') and not file_.startswith('.'):
             file_path = os.sep.join([folder] + subfolders + [file_])
             data_info = read_odds_file(file_path)[0]
+            # Get file corresponding to the match odds
             if "marketType" in data_info["mc"][0]["marketDefinition"]\
+            and data_info["mc"][0]["marketDefinition"]["status"]=="OPEN"\
             and data_info["mc"][0]["marketDefinition"]["marketType"]=="MATCH_ODDS":
-            #if data_info["mc"][0]
-                print(file_path)
-                match_odds_filenames.append(file_path)
-
+                try:
+                    match = match_goals.Match(file_path)
+                    if match.start_data\
+                    and match.start_data["mc"][0]["marketDefinition"]["marketType"]=="MATCH_ODDS":
+                        print("{0} added to cache".format(file_path))
+                        match_odds_filenames.append(file_path)
+                except UnboundLocalError as e:
+                    print(e)
+                    print("UnboundLocalError for: {0}. Odds for the wrong events appear in this file".format(file_path))
+                except IndexError as e:
+                    print(e)
+                    print("IndexError for: {0}".format(file_path))
+                    sys.exit()
+                except TypeError as e:
+                    print("No odds data for: {0}".format(file_path))
+                    
+print("Writing caching file")
 # cache list of filepaths
 with open('filepaths.json', 'w') as f:
     json.dump(match_odds_filenames, f)
