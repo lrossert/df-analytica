@@ -1,10 +1,13 @@
 import json
 import sys
 import copy
+import pandas as pd
+import numpy as np
 
-odds_file = "data/xds/historic/BASIC/28522440/1.138129751" 
+#odds_file = "data/xds/historic/BASIC/28522440/1.138129751" 
 #odds_file = "data/xds/historic/BASIC/28553681/1.139123056" 
-#odds_file = "data/xds/historic/BASIC/28521533/1.138102654"
+odds_file = "data/xds/historic/BASIC/28521533/1.138102654"
+odds_file = "data/xds/historic/BASIC/28525933/1.138270650"
 
 class Match():
 
@@ -18,9 +21,7 @@ class Match():
             self.draw_id, self.home_id, self.away_id = self.get_ids()
             self.outcomes = list(self.get_ids())
             self.match_start_odds = self.get_draw_odds_1_min_before_start()
-            self.goal_data = self.match_goal_data()
             self.end_idx = self.get_end_idx()
-            self.goals = self.get_goals()
             self.match_odds_data = self.get_match_odds_data()
 
 
@@ -51,21 +52,6 @@ class Match():
             if event["mc"][0]["marketDefinition"]["inPlay"]:
                 return event
     
-    def match_goal_data(self):
-        """Returns list of dicts of events when goals occur."""
-        start_idx = 0
-        for event in self.events:
-            if event==self.start_data:
-                break
-            start_idx = start_idx + 1
-        goal_data = self.events[start_idx+1:]
-        # remove closing odds
-        goal_data = goal_data[:-2]
-        # there are 2 entries for every goal so we take the second ones
-        goal_data = [goal_data[goal_idx] for goal_idx in range(len(goal_data))\
-                        if goal_idx%2==1]
-        return goal_data
-
     def get_ids(self):
         """Returns the unique ids for draw, home and away teams."""
         event_ids = self.start_data["mc"][0]["marketDefinition"]["runners"]
@@ -104,7 +90,7 @@ class Match():
     def get_end_idx(self):
         start_idx = 0
         for entry in self.data:
-            if entry==self.goal_data[-1]:
+            if entry==self.events[-1]:
                 break
             start_idx = start_idx + 1
         return start_idx
@@ -145,45 +131,6 @@ class Match():
             odds_dict.update(odds_dict_entry)
         return odds_dict       
 
-    def check_goal_scored(self, goal_dict, goal_list, goal, clk):
-        odds_after_goal = self._prettify_odds(goal["mc"][0]["rc"])
-        if not goal_dict:
-            print("Making goal_dict")
-            goal_dict = {"clk": clk, self.home_id: 0, self.away_id: 0}
-        else:
-            goal_dict = copy.deepcopy(goal_dict)
-            goal_dict["clk"] = clk
-        odds_before_goal = self._get_odds_before_goal(goal)
-        odds_before_goal = self._prettify_odds(odds_before_goal)
-        if odds_before_goal[self.home_id] < odds_after_goal[self.home_id]\
-        and odds_before_goal[self.away_id] > odds_after_goal[self.away_id]:
-            goal_dict[self.away_id] = goal_dict[self.away_id] + 1
-        elif odds_before_goal[self.home_id] > odds_after_goal[self.home_id]\
-        and odds_before_goal[self.away_id] < odds_after_goal[self.away_id]:
-            goal_dict[self.home_id] = goal_dict[self.home_id] + 1
-        else:
-            print("Can't conclude there was a goal")
-        goal_list.append(goal_dict)
-        return goal_list
-
-
-    
-    def get_goals(self):
-        """Returns a list of scores at clk times when the goals happen.
-    
-        Compares the odds just before the goal event to the odds after
-        to estimate which team scored."""
-        goal_list = []
-        goal_dict = {}
-        for goal in self.goal_data:
-            clk = goal["clk"]
-            try:
-                goal_list = self.check_goal_scored(goal_dict, goal_list, goal, clk)
-            except KeyError:
-                print("No odds available. Match coming towards an end at time {0}"\
-                .format(goal["clk"]))
-        return goal_list
-    
     def get_match_odds_data(self):
         """Returns a list of dicts of times and odds at those times.
         Where odds are not available take the previous odds as a proxy."""
@@ -200,8 +147,6 @@ class Match():
                     formatted_odds["home_odds"] = formatted_odds.pop(self.home_id)
                 if self.away_id in formatted_odds.keys():
                     formatted_odds["away_odds"] = formatted_odds.pop(self.away_id)
-                for goal in self.goals:
-                    goal_clk = goal["clk"]
                 formatted_odds.update({"clk": clk})
                 # Make the assmption that if the odds are not given they havent
                 # changed from the previous odds.
@@ -222,7 +167,7 @@ class Match():
             except KeyError as e:
                 print("No odds available. Match coming towards an end at time {0}"\
                 .format(clk))
-        return match_data
+        return pd.DataFrame(match_data)
 
 if __name__ == "__main__":
     match = Match(odds_file)
